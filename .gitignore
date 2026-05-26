@@ -1,0 +1,24 @@
+# 의존성 패키지 폴더 제외 (npm install 시 재생성되므로 커밋하지 않습니다)
+node_modules/
+
+# 빌드 결과물 폴더 제외 (npm run build 시 재생성되는 프로덕션용 번들)
+dist/
+dist-ssr/
+*.local
+
+# 시스템 및 임시 파일 제외
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE 및 편집기 설정 폴더 제외
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
