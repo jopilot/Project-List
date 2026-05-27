@@ -59,9 +59,9 @@ export const ApiKeyInput: React.FC<ApiKeyInputProps> = ({
             <Key className="w-5 h-5 animate-pulse" />
           </div>
           <div>
-            <h3 className="font-semibold text-slate-100 font-sans tracking-wide">Google AI API 설정</h3>
+            <h3 className="font-semibold text-slate-100 font-sans tracking-wide">Google Gemini API 설정</h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Gemini 2.5 Flash 상담을 위해 API Key를 입력하세요. 브라우저 로컬 저장소에만 안전하게 기록됩니다.
+              Gemini AI 연동을 위해 API Key를 입력하세요. 브라우저 로컬 저장소에만 안전하게 기록됩니다.
             </p>
           </div>
         </div>
