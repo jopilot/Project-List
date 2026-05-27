@@ -95,6 +95,12 @@ export const App: React.FC = () => {
     setProjects((prev) => prev.filter((p) => p.id !== id));
   };
 
+  // 7-2. 모든 프로젝트 일괄 삭제 핸들러 함수 (한글 주석 규칙 준수)
+  // 대시보드 리스트의 모든 데이터를 빈 배열([])로 초기화하고 로컬 스토리지에 동기화합니다.
+  const handleClearAllProjects = () => {
+    setProjects([]);
+  };
+
   // 8. PDF 파싱이 완료되어 새로운 프로젝트 배열이 대량 업로드되었을 때 실행되는 병합 콜백 함수
   const handleUploadSuccess = (extractedList: Project[]) => {
     // 추출된 목록을 기존 리스트 맨 앞에 머지합니다.
@@ -264,6 +270,7 @@ export const App: React.FC = () => {
               onAddProject={handleAddProject}
               onUpdateProject={handleUpdateProject}
               onDeleteProject={handleDeleteProject}
+              onClearAllProjects={handleClearAllProjects} // [신규 추가] 전체 프로젝트 일괄 삭제 콜백 함수 전달
             />
 
           </div>

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-// Lucide React에서 모던한 편집, 삭제, 플러스, 검색, 깔때기(필터) 아이콘 등을 가져옵니다.
-import { Edit3, Trash2, Plus, Search, Filter, X, Save, AlertCircle } from 'lucide-react';
+// Lucide React에서 모던한 편집, 삭제, 플러스, 검색, 깔때기(필터) 아이콘 및 [신규] 다운로드, 복사, 체크 아이콘을 가져옵니다.
+import { Edit3, Trash2, Plus, Search, Filter, X, Save, AlertCircle, Download, Copy, Check } from 'lucide-react';
 // 공통 데이터 타입 불러오기
 import { Project } from '../types';
 
@@ -10,6 +10,7 @@ interface ProjectTableProps {
   onAddProject: (newProj: Project) => void;     // 신규 프로젝트 수동 추가 콜백
   onUpdateProject: (updatedProj: Project) => void; // 기존 프로젝트 수정 완료 콜백
   onDeleteProject: (projectId: string) => void;  // 기존 프로젝트 삭제 콜백
+  onClearAllProjects: () => void;               // [신규 추가] 전체 프로젝트 일괄 삭제 콜백
 }
 
 export const ProjectTable: React.FC<ProjectTableProps> = ({
@@ -17,11 +18,110 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({
   onAddProject,
   onUpdateProject,
   onDeleteProject,
+  onClearAllProjects, // [신규 추가] 전체 프로젝트 일괄 삭제 콜백 함수 받아오기
 }) => {
   // --- 검색 및 필터링을 위한 상태 ---
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedIndustry, setSelectedIndustry] = useState<string>('All');
   const [selectedRegion, setSelectedRegion] = useState<string>('All');
+
+  // --- [신규 추가] 클립보드 복사 성공 시각 피드백을 위한 상태 ---
+  const [copied, setCopied] = useState<boolean>(false);
+
+  // --- [신규 추가] 엑셀 다운로드 (CSV 내보내기) 기능 (한글 주석 준수) ---
+  // 한국어 및 화폐 기호가 엑셀에서 깨지지 않도록 UTF-8 BOM(\uFEFF)을 주입한 뒤 CSV Blob을 다운로드합니다.
+  const handleExportCSV = () => {
+    if (filteredProjects.length === 0) {
+      alert('내보낼 프로젝트 데이터가 없습니다.');
+      return;
+    }
+
+    // CSV 파일 헤더 정의 (표기용 한글 헤더 대신 보편적인 영어 데이터로 매핑)
+    const headers = ['Industry', 'Region', 'Country', 'Project Name', 'Client', 'Amount', 'EPC Contractor', 'Awarded Date', 'Capacity'];
+    
+    // 현재 검색/필터링 조건이 적용된 리스트 기준으로 엑셀 행을 추출합니다.
+    const rows = filteredProjects.map(proj => [
+      proj.industry,
+      proj.region,
+      proj.country,
+      proj.projectName,
+      proj.client,
+      proj.amount,
+      proj.epcContractor,
+      proj.awardedDate,
+      proj.capacity
+    ]);
+
+    // CSV 데이터 내용물 생성 (값 내부에 콤마나 큰따옴표가 들어있을 때의 이스케이프 파싱 예외 처리 완벽 수행)
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => 
+        row.map(val => {
+          const cleanVal = val ? val.replace(/"/g, '""') : '';
+          return `"${cleanVal}"`;
+        }).join(',')
+      )
+    ].join('\n');
+
+    // UTF-8 인코딩 깨짐을 원천 차단하기 위한 BOM(Byte Order Mark) 강제 삽입
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    // 파일명 구성 (다운로드 시점 날짜 포함하여 저장 관리 용이)
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Projects_Export_${today}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // --- [신규 추가] 클립보드 복사 (스프레드시트 친화적 TSV 포맷) 기능 (한글 주석 준수) ---
+  // 사용자가 엑셀이나 구글 스프레드시트에 Ctrl+V로 붙여넣었을 때 표 구조가 완벽히 보존되도록 탭(\t) 구분 TSV 포맷을 만듭니다.
+  const handleCopyToClipboard = () => {
+    if (filteredProjects.length === 0) {
+      alert('복사할 프로젝트 데이터가 없습니다.');
+      return;
+    }
+
+    // TSV 파일 헤더 정의
+    const headers = ['Industry', 'Region', 'Country', 'Project Name', 'Client', 'Amount', 'EPC Contractor', 'Awarded Date', 'Capacity'];
+    
+    // 데이터 행 맵핑
+    const rows = filteredProjects.map(proj => [
+      proj.industry,
+      proj.region,
+      proj.country,
+      proj.projectName,
+      proj.client,
+      proj.amount,
+      proj.epcContractor,
+      proj.awardedDate,
+      proj.capacity
+    ]);
+
+    // 탭(\t) 구분자로 한 행씩 문자열 연결
+    const tsvContent = [
+      headers.join('\t'),
+      ...rows.map(row => row.map(val => val || '').join('\t'))
+    ].join('\n');
+
+    // 클립보드 API 호출하여 복사 적용
+    navigator.clipboard.writeText(tsvContent)
+      .then(() => {
+        // 복사 성공 상태 피드백 활성화
+        setCopied(true);
+        // 2초 후 완료 체크 상태 복원
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(err => {
+        console.error('클립보드 복사 실패:', err);
+        alert('클립보드 복사에 실패했습니다. 브라우저 권한을 확인해주세요.');
+      });
+  };
 
   // --- CRUD 모달 제어를 위한 상태 ---
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -174,7 +274,7 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({
     <div className="glass-card rounded-2xl border border-slate-800 shadow-xl p-6 flex flex-col gap-6 w-full">
       
       {/* 1. 테이블 제어 및 검색 헤더 영역 */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
         <div>
           <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
             프로젝트 데이터베이스 리스트
@@ -187,14 +287,61 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({
           </p>
         </div>
 
-        {/* 신규 등록 버튼 */}
-        <button
-          onClick={openCreateModal}
-          className="btn-premium text-white flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold tracking-wide shrink-0 self-end md:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          신규 프로젝트 수동 등록
-        </button>
+        {/* [신규 구현] 대시보드 액션 버튼 그룹 (엑셀 다운로드, 표 복사, 일괄 전체 삭제, 신규 등록) */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0 justify-end">
+          
+          {/* 클립보드 표 복사 버튼: 사용자가 바로 엑셀/스프레드시트에 Ctrl+V로 복사 붙여넣기 하도록 지원 */}
+          <button
+            onClick={handleCopyToClipboard}
+            title="엑셀/스프레드시트에 바로 붙여넣을 수 있게 복사"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-slate-100 rounded-xl text-xs font-bold transition-all cursor-pointer"
+          >
+            {copied ? (
+              <>
+                <Check className="w-4 h-4 text-emerald-400" />
+                <span className="text-emerald-400 font-bold">복사 완료!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4 text-slate-400" />
+                <span>표 복사</span>
+              </>
+            )}
+          </button>
+
+          {/* 엑셀 다운로드 버튼: BOM이 탑재된 깨짐 없는 CSV 추출을 브라우저 즉시 다운으로 제공 */}
+          <button
+            onClick={handleExportCSV}
+            title="현재 필터링된 목록을 CSV 파일로 다운로드"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-slate-100 rounded-xl text-xs font-bold transition-all cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-slate-400" />
+            <span>Excel 다운</span>
+          </button>
+
+          {/* 전체 프로젝트 삭제 버튼: 대시보드를 통째로 완전히 비우는 편의 기능 (오작동 방지 confirm 경고 포함) */}
+          <button
+            onClick={() => {
+              if (confirm('⚠️ 경고: 저장되어 있는 모든 프로젝트 리스트를 영구히 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+                onClearAllProjects();
+              }
+            }}
+            title="등록된 모든 데이터를 삭제하여 대시보드 리셋"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>전체 삭제</span>
+          </button>
+
+          {/* 신규 등록 버튼 */}
+          <button
+            onClick={openCreateModal}
+            className="btn-premium text-white flex items-center justify-center gap-1.5 px-4.5 py-2 rounded-xl text-xs font-bold tracking-wide cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            신규 프로젝트 수동 등록
+          </button>
+        </div>
       </div>
 
       {/* 2. 실시간 다차원 필터링 및 검색 컨트롤바 */}
